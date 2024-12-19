@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LIVE OFFLINE</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        
+        /* Add new styles */
+        .content-overlay {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #FFE600;
+            font-family: 'NeueMontreal-Bold';
+            z-index: 1;
+            width: 90%;
+            max-width: 600px;
+        }
+        
+        .content-overlay h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .content-overlay a {
+            color: #FFE600;
+            text-decoration: none;
+            padding: 10px 20px;
+            border: 2px solid #FFE600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .content-overlay a:hover {
+            background: #FFE600;
+            color: black;
+        }
+
+        /* Mobile styles */
+        @media screen and (max-width: 768px) {
+            .content-overlay {
+                bottom: 15%;
+            }
+            
+            .content-overlay h2 {
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
+            
+            .content-overlay a {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+        }
+
+        /* Small mobile styles */
+        @media screen and (max-width: 480px) {
+            .content-overlay {
+                bottom: 10%;
+            }
+            
+            .content-overlay h2 {
+                font-size: 18px;
+                margin-bottom: 12px;
+            }
+            
+            .content-overlay a {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+
+        @font-face {
+            font-family: 'NeueMontreal-Bold'; /* Replace with actual font name */
+            src: url('./assets/fonts/NeueMontreal-Bold.woff2') format('woff2'); /* Update path/filename */
+        }
+
+        @font-face {
+            font-family: 'NeueMontreal-Regular';
+            src: url('./assets/fonts/NeueMontreal-Regular.woff2') format('woff2');
+        }
+    </style>
+</head>
+<body>
+    <!-- Add new div after the canvas but before the scripts -->
+    <div class="content-overlay">
+        <h2>TIME TO GET OFFLINE</h2>
+        <a href="#">CLICK HERE TO GET YOUR STICKER</a>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set up scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,  // Enable antialiasing
+            alpha: true       // Enable transparency
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio); // Match device pixel ratio
+        document.body.appendChild(renderer.domElement);
+
+        // Create sticker plane
+        const textureLoader = new THREE.TextureLoader();
+
+        // Main sticker texture
+        const stickerTexture = textureLoader.load('./sticker.png', // Your sticker image
+            function ( texture ) {
+                console.log('Sticker texture loaded successfully');
+                frontMaterial.needsUpdate = true;
+            }
+        );
+
+        // Subtle plastic/glossy texture for front
+        const frontBumpTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/water/Water_1_M_Normal.jpg', 
+            function ( texture ) {
+            }
+        );
+
+        // Paper texture for back
+        const paperTexture = textureLoader.load('./backing.jpg',
+            function ( texture ) {
+            }
+        );
+        // Load paper texture for front
+        const frontPaperTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/patterns/bright_squares256.png',
+            function ( texture ) {
+                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(8, 4); // More fine-grained texture
+            }
+        );
+
+        // Create geometries for main sticker and backing
+        const frontGeometry = new THREE.PlaneGeometry(2, 1);
+        const backingGeometry = new THREE.BoxGeometry(2.05, 1.05, 0.008, 32, 32);
+
+        // Create edge geometry
+        const edgeGeometry = new THREE.BoxGeometry(2, 1, 0.005);
+        edgeGeometry.translate(0, 0, -0.0025); // Center the edge geometry
+
+        // Materials
+        const frontMaterial = new THREE.MeshPhongMaterial({ 
+            map: stickerTexture,
+            bumpMap: frontPaperTexture,
+            bumpScale: 0.05,     // Increased from 0.02
+            normalMap: frontBumpTexture, // Add normal mapping
+            normalScale: new THREE.Vector2(0.1, 0.1), // Control normal map intensity
+            transparent: true,
+            depthWrite: true,
+            depthTest: true,
+            shininess: 50,       // Increased from 30
+            specular: 0x666666   // Brighter specular
+        });
+
+        const backMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0xe8e8e8,     // Distinctly off-white
+            side: THREE.BackSide,
+            depthWrite: true,
+            depthTest: true,
+            shininess: 10,
+            specular: 0x444444
+        });
+
+        const backingMaterial = new THREE.MeshPhongMaterial({
+            color: 0xe0e0e0,     // Even more off-white to show texture better
+            map: paperTexture,
+            bumpMap: paperTexture,
+            bumpScale: 0.01,
+            depthWrite: true,
+            depthTest: true,
+            shininess: 10,
+            specular: 0x444444
+        });
+
+        // Create materials for the sides of the sticker
+        const stickerSideMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0xe8e8e8,     // Match the back color
+            side: THREE.DoubleSide,
+            depthWrite: true,
+            depthTest: true,
+            shininess: 10,
+            specular: 0x444444
+        });
+
+        // Create the sticker components
+        const stickerFront = new THREE.Mesh(frontGeometry, frontMaterial);
+        const stickerEdges = new THREE.Mesh(edgeGeometry, stickerSideMaterial);
+        const backing = new THREE.Mesh(backingGeometry, backingMaterial);
+
+        // Create a group to hold the sticker parts
+        const stickerGroup = new THREE.Group();
+        stickerGroup.add(stickerFront);
+        stickerGroup.add(stickerEdges);
+        stickerGroup.add(backing);
+
+        // Position backing
+        backing.position.z = -0.01;
+
+        // Add to scene
+        scene.add(stickerGroup);
+
+        // Remove or comment out the axes helper lines
+        // const axesHelper = new THREE.AxesHelper(5);
+        // scene.add(axesHelper);
+
+        // Change background color to black
+        scene.background = new THREE.Color(0x000000);
+        renderer.setClearColor(0x000000);
+
+        // New lighting setup
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Reduced intensity
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xFDF4DC, 1.0); // Increased intensity
+        mainLight.position.set(1, 1, 1);
+        scene.add(mainLight);
+
+        // Add a second light for better coverage
+        const secondaryLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        secondaryLight.position.set(-1, -1, 1);
+        scene.add(secondaryLight);
+
+        // Position camera
+        camera.position.z = 2;
+
+        // Mouse movement tracking
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX - window.innerWidth / 2) / 100;
+            mouseY = (event.clientY - window.innerHeight / 2) / 100;
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            targetRotationX = mouseY * 0.5;
+            targetRotationY = mouseX * 0.5;
+            
+            stickerGroup.rotation.x += (targetRotationX - stickerGroup.rotation.x) * 0.05;
+            stickerGroup.rotation.y += (targetRotationY - stickerGroup.rotation.y) * 0.05;
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resizing
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('orientationchange', onWindowResize); // Add orientation change handler
+
+        function onWindowResize() {
+            // Get new window dimensions
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            // Update camera
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+
+            // Update renderer
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
+
+            // Adjust camera position based on screen size
+            if (width <= 768) {
+                // For mobile devices, move camera back to show full sticker
+                camera.position.z = width <= 480 ? 4 : 3;
+            } else {
+                // Desktop view
+                camera.position.z = 2;
+            }
+        }
+
+        // Call once on initial load
+        onWindowResize();
+
+        animate();
+
+        // Add these properties to both meshes
+        stickerFront.renderOrder = 2;  // Render front sticker last
+        backing.renderOrder = 1;       // Render backing first
+
+        // Optional: Enable depth testing
+        renderer.sortObjects = false;  // Disable automatic sorting
+
+        // Add these renderer settings
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.sortObjects = false;
+        renderer.autoClear = true;
+        renderer.setClearColor(0x000000);
+    </script>
+</body>
+</html>
